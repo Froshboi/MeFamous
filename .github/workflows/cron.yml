@@ -1,0 +1,44 @@
+name: Scheduled Sync Jobs
+
+# Replaces Vercel Cron (see vercel.json) now that the app is deployed on
+# Railway. Same schedules, same routes, same auth header the app already
+# expects — no app code changes needed.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   APP_URL      e.g. https://mefamous.up.railway.app  (no trailing slash)
+#   CRON_SECRET  same value as the CRON_SECRET env var set on the Railway service
+
+on:
+  schedule:
+    # Sync provider service catalog — every 6 hours
+    - cron: "0 */6 * * *"
+    # Poll in-flight order status — every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # allows manual "Run workflow" from the Actions tab
+
+jobs:
+  sync-services:
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/sync-services
+        run: |
+          status=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/sync-services")
+          echo "HTTP $status"
+          cat /tmp/body.txt
+          if [ "$status" -ge 300 ]; then exit 1; fi
+
+  sync-orders:
+    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/sync-orders
+        run: |
+          status=$(curl -s -o /tmp/body.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/sync-orders")
+          echo "HTTP $status"
+          cat /tmp/body.txt
+          if [ "$status" -ge 300 ]; then exit 1; fi

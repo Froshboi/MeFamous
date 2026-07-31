@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MeFamous</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  </head>
+  <body>
+    <!--
+      This file only renders if the native shell ever loads local content
+      instead of the live site (e.g. capacitor.config.ts server.url is
+      unset, or the device is offline on first launch). In normal
+      operation, Capacitor's server.url points straight at the deployed
+      Next.js app — MeFamous's Server Actions, auth, and webhooks all run
+      server-side and can't run inside the WebView itself.
+    -->
+    <p>Loading MeFamous…</p>
+    <script>
+      window.location.href = "https://mefamous.vercel.app";
+    </script>
+  </body>
+</html>
