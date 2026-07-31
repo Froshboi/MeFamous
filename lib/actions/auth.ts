@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -18,6 +19,19 @@ export type AuthActionState = {
 
 function firstIssueMessage(issues: { message: string }[]): string {
   return issues[0]?.message ?? "Please check the form and try again.";
+}
+
+// Helper to get the app URL reliably on server
+async function getAppUrl(): Promise<string> {
+  // Try env var first
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (envUrl) return envUrl;
+
+  // Fallback to request headers (for server actions)
+  const h = await headers();
+  const host = h.get("host") ?? "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  return `${protocol}://${host}`;
 }
 
 export async function signUpAction(
@@ -39,8 +53,7 @@ export async function signUpAction(
 
   const { fullName, email, password, role, referralCode } = parsed.data;
   const supabase = await createClient();
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = await getAppUrl();
 
   const { error } = await supabase.auth.signUp({
     email,
@@ -49,9 +62,6 @@ export async function signUpAction(
       emailRedirectTo: `${appUrl}/auth/callback?next=/dashboard`,
       data: {
         full_name: fullName,
-        // Requested role at signup. The database trigger copies this into
-        // profiles.role; access-control decisions still read from
-        // profiles.role / app_metadata.role, never from this raw value.
         requested_role: role,
         referral_code: referralCode || null,
       },
@@ -92,19 +102,23 @@ export async function signInAction(
   redirect("/dashboard");
 }
 
-export async function signInWithGoogleAction(): Promise<void> {
+export async function signInWithGoogleAction(): Promise<AuthActionState> {
   const supabase = await createClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = await getAppUrl();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${appUrl}/auth/callback?next=/dashboard` },
+    options: { 
+      redirectTo: `${appUrl}/auth/callback?next=/dashboard`,
+    },
   });
 
   if (error || !data.url) {
-    redirect("/login?error=google-oauth-failed");
+    return { error: "Google sign-in failed. Please try again." };
   }
 
+  // Return the URL instead of redirecting — let the client handle it
+  // This avoids server action redirect issues
   redirect(data.url);
 }
 
@@ -128,7 +142,7 @@ export async function forgotPasswordAction(
   }
 
   const supabase = await createClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = await getAppUrl();
 
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${appUrl}/auth/callback?next=/reset-password`,
