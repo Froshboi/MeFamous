@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/supabase/queries/profile";
 import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "@/lib/actions/auth";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", roles: ["customer", "reseller", "admin", "super_admin", "moderator"] },
@@ -73,6 +74,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <p className="text-xs capitalize text-slate-500">{user.role}</p>
             </div>
             <div className="flex items-center gap-3">
+              <ThemeToggle />
               <NotificationBell notifications={notifications} />
               <form action={signOutAction}>
                 <button
