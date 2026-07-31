@@ -7,17 +7,18 @@ export default async function AdminProviderPage() {
   const activeProviderKey = await getActiveProviderKey();
   const availableProviders = listProviders().map((p) => ({ key: p.key, displayName: p.displayName }));
 
+  // Use .maybeSingle() instead of .single() to avoid errors when rows don't exist
   const { data: autoSyncSetting } = await admin
     .from("app_settings")
     .select("value")
     .eq("key", "provider_auto_sync_enabled")
-    .single();
+    .maybeSingle();
 
   const { data: lastSyncedSetting } = await admin
     .from("app_settings")
     .select("value")
     .eq("key", `${activeProviderKey}_last_synced_at`)
-    .single();
+    .maybeSingle();
 
   const { data: logs } = await admin
     .from("provider_api_logs")
