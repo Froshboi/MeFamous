@@ -119,10 +119,6 @@ export async function signInWithGoogleAction(): Promise<void> {
 
   redirect(data.url);
 }
-  // Return the URL instead of redirecting — let the client handle it
-  // This avoids server action redirect issues
-  redirect(data.url);
-}
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
