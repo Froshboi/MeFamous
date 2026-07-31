@@ -119,11 +119,6 @@ export async function signInWithGoogleAction(): Promise<void> {
 
   redirect(data.url);
 }
-
-  if (error || !data.url) {
-    return { error: "Google sign-in failed. Please try again." };
-  }
-
   // Return the URL instead of redirecting — let the client handle it
   // This avoids server action redirect issues
   redirect(data.url);
