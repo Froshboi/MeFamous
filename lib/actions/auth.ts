@@ -23,12 +23,20 @@ function firstIssueMessage(issues: { message: string }[]): string {
 
 // Helper to get the app URL reliably on server
 async function getAppUrl(): Promise<string> {
-  // Try env var first
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return envUrl;
+  // 1. Production env var (MUST be set in prod)
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (envUrl) return envUrl.replace(/\/$/, "");
 
-  // Fallback to request headers (for server actions)
+  // 2. Reverse proxy headers (Vercel, Nginx, AWS ALB, etc.)
   const h = await headers();
+  const forwardedHost = h.get("x-forwarded-host");
+  const forwardedProto = h.get("x-forwarded-proto");
+  if (forwardedHost) {
+    const proto = forwardedProto ?? "https";
+    return `${proto}://${forwardedHost}`;
+  }
+
+  // 3. Direct request headers (dev only — unreliable in Docker)
   const host = h.get("host") ?? "localhost:3000";
   const protocol = host.includes("localhost") ? "http" : "https";
   return `${protocol}://${host}`;
