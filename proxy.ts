@@ -7,13 +7,13 @@ const ADMIN_ONLY_PREFIXES = ["/admin"];
 const RESELLER_ONLY_PREFIXES = ["/dashboard/reseller"];
 
 /**
- * Next.js 16 renamed the middleware.ts convention to proxy.ts (the exported
- * function must be named `proxy`, not `middleware`). Functionally this still
- * runs on every matched request before rendering, so it's where we keep the
- * Supabase session cookie in sync and gate protected routes by role.
+ * Next.js 16 proxy convention.
+ * Keeps Supabase session cookies synced and protects routes by role.
  */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  let response = NextResponse.next({
+    request,
+  });
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,39 +23,68 @@ export async function proxy(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
+
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request: { headers: request.headers } });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+
+          response = NextResponse.next({
+            request,
+          });
+
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
+
+  /**
+   * Redirect helper that preserves refreshed Supabase cookies.
+   * Do not use NextResponse.redirect() directly after auth refresh.
+   */
+  const redirect = (url: URL) => {
+    const redirectResponse = NextResponse.redirect(url);
+
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(
+        cookie.name,
+        cookie.value,
+        cookie
+      );
+    });
+
+    return redirectResponse;
+  };
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
-  const isAdminOnly = ADMIN_ONLY_PREFIXES.some((p) => path.startsWith(p));
-  const isResellerOnly = RESELLER_ONLY_PREFIXES.some((p) => path.startsWith(p));
+
+  const isProtected = PROTECTED_PREFIXES.some((p) =>
+    path.startsWith(p)
+  );
+
+  const isAdminOnly = ADMIN_ONLY_PREFIXES.some((p) =>
+    path.startsWith(p)
+  );
+
+  const isResellerOnly = RESELLER_ONLY_PREFIXES.some((p) =>
+    path.startsWith(p)
+  );
 
   if (isProtected && !user) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", path);
-    return NextResponse.redirect(redirectUrl);
+
+    return redirect(redirectUrl);
   }
 
-  // Only hit the DB for role-gated paths — every other protected route
-  // just needs "is there a user", which the check above already covers.
   if (user && (isAdminOnly || isResellerOnly)) {
-    // role lives in the `profiles` table, NOT user.app_metadata — nothing
-    // in this codebase ever sets app_metadata.role, so reading it here
-    // would always silently fall back to "customer" and lock real
-    // admins/resellers out of their own routes.
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -64,12 +93,21 @@ export async function proxy(request: NextRequest) {
 
     const role = (profile?.role as string | undefined) ?? "customer";
 
-    if (isAdminOnly && role !== "admin" && role !== "super_admin") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (
+      isAdminOnly &&
+      role !== "admin" &&
+      role !== "super_admin"
+    ) {
+      return redirect(new URL("/dashboard", request.url));
     }
 
-    if (isResellerOnly && role !== "reseller" && role !== "admin" && role !== "super_admin") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (
+      isResellerOnly &&
+      role !== "reseller" &&
+      role !== "admin" &&
+      role !== "super_admin"
+    ) {
+      return redirect(new URL("/dashboard", request.url));
     }
   }
 
@@ -77,5 +115,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
+  ],
 };
