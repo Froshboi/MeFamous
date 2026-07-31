@@ -10,14 +10,7 @@ export interface SyncResult {
 
 /**
  * Pulls the full catalog from whichever provider is currently active and
- * upserts it into `services`, keyed on (provider, provider_service_id) —
- * NOT on services.id, which is now just an internal identifier. Existing
- * rows keep their admin-set `markup_percent` / `is_active`. Services no
- * longer returned by the provider are deactivated, never deleted, so past
- * orders keep a valid foreign key. If the active provider changes,
- * services from the previously-active provider are left untouched (they
- * simply stop being kept in sync) — switching providers doesn't silently
- * wipe or reprice anything.
+ * upserts it into `services`, keyed on (provider, provider_service_id).
  */
 export async function syncActiveProviderCatalog(): Promise<SyncResult> {
   const provider = await getActiveProvider();
@@ -28,9 +21,15 @@ export async function syncActiveProviderCatalog(): Promise<SyncResult> {
     .from("services")
     .select("provider_service_id, markup_percent, is_active")
     .eq("provider", provider.key);
-  if (fetchError) throw fetchError;
+  
+  if (fetchError) {
+    console.error("Failed to fetch existing services:", fetchError);
+    throw new Error(`Failed to fetch existing services: ${fetchError.message}`);
+  }
 
-  const existingByProviderServiceId = new Map((existing ?? []).map((row) => [row.provider_service_id, row]));
+  const existingByProviderServiceId = new Map(
+    (existing ?? []).map((row) => [row.provider_service_id, row])
+  );
   const seenIds = new Set<string>();
 
   const upserts = services.map((service) => {
@@ -57,7 +56,11 @@ export async function syncActiveProviderCatalog(): Promise<SyncResult> {
     const { error } = await admin
       .from("services")
       .upsert(upserts, { onConflict: "provider,provider_service_id" });
-    if (error) throw error;
+    
+    if (error) {
+      console.error("Upsert failed:", error);
+      throw new Error(`Failed to upsert services: ${error.message}`);
+    }
   }
 
   const staleIds = [...existingByProviderServiceId.keys()].filter((id) => !seenIds.has(id));
@@ -67,12 +70,23 @@ export async function syncActiveProviderCatalog(): Promise<SyncResult> {
       .update({ is_active: false })
       .eq("provider", provider.key)
       .in("provider_service_id", staleIds);
-    if (error) throw error;
+    
+    if (error) {
+      console.error("Deactivation failed:", error);
+      throw new Error(`Failed to deactivate stale services: ${error.message}`);
+    }
   }
 
-  await admin
+  const { error: settingsError } = await admin
     .from("app_settings")
-    .upsert({ key: `${provider.key}_last_synced_at`, value: new Date().toISOString() });
+    .upsert({ 
+      key: `${provider.key}_last_synced_at`, 
+      value: new Date().toISOString() 
+    });
+  
+  if (settingsError) {
+    console.error("Failed to update last sync time:", settingsError);
+  }
 
   return { provider: provider.key, synced: upserts.length, deactivated: staleIds.length };
 }
