@@ -81,7 +81,9 @@ export default async function WalletPage({
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6 opacity-60">
           <h2 className="mb-3 text-lg font-medium">Pay with Card (Korapay)</h2>
           <p className="text-sm text-slate-400 mb-3">Coming soon — instant card and bank payments.</p>
-          <KorapayTopupForm disabled />
+          <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center">
+  <p className="text-sm text-slate-500">Card payments coming soon</p>
+</div>
         </div>
 
         {/* Crypto */}
