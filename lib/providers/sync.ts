@@ -45,8 +45,8 @@ export async function syncActiveProviderCatalog(): Promise<SyncResult> {
       markup_percent: prior?.markup_percent ?? 30,
       min_quantity: service.min,
       max_quantity: service.max,
-      supports_refill: service.refill,
-      supports_cancel: service.cancel,
+      supports_refill: service.refill ?? false,   // ← coerce null to false
+      supports_cancel: service.cancel ?? false,     // ← coerce null to false
       is_active: prior ? prior.is_active : true,
       synced_at: new Date().toISOString(),
     };
