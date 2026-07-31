@@ -39,7 +39,7 @@ export default async function ServicesPage({
       <div>
         <h1 className="text-2xl font-semibold">Services</h1>
         <p className="text-sm text-slate-400">
-          Synced from our provider catalog. Pricing already includes our platform fee.
+          Browse and order social media growth services.
         </p>
       </div>
 
