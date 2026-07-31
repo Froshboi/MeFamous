@@ -7,9 +7,16 @@ const ADMIN_ONLY_PREFIXES = ["/admin"];
 const RESELLER_ONLY_PREFIXES = ["/dashboard/reseller"];
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // 🔑 PASS THROUGH — don't touch cookies before OAuth callback handler
+  if (path === "/auth/callback" || path.startsWith("/auth/")) {
+    return NextResponse.next({ request: { headers: request.headers } });
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } });
 
-  const supabase = createServerClient<Database>(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -31,7 +38,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
   const isAdminOnly = ADMIN_ONLY_PREFIXES.some((p) => path.startsWith(p));
   const isResellerOnly = RESELLER_ONLY_PREFIXES.some((p) => path.startsWith(p));
