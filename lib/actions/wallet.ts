@@ -134,3 +134,55 @@ export async function claimCryptoTopupAction(
     message: "Claim submitted. We'll credit your wallet once we confirm the transaction on-chain.",
   };
 }
+const bankTransferSchema = z.object({
+  amount: z.coerce.number().positive().min(100, "Minimum top-up is ₦100"),
+  senderName: z.string().min(2, "Enter sender name").max(100),
+  txNote: z.string().min(3, "Add a reference or note").max(500),
+});
+
+/**
+ * Manual bank transfer — user sends to OPay, submits proof, admin verifies.
+ */
+export async function submitBankTransferAction(
+  _prevState: WalletActionState,
+  formData: FormData
+): Promise<WalletActionState> {
+  const parsed = bankTransferSchema.safeParse({
+    amount: formData.get("amount"),
+    senderName: formData.get("senderName"),
+    txNote: formData.get("txNote"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Please check the form" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You need to be signed in to submit a transfer." };
+  }
+
+  const reference = `MFBANK-${randomUUID()}`;
+  const { error } = await supabase.from("wallet_topups").insert({
+    user_id: user.id,
+    reference,
+    amount: parsed.data.amount,
+    currency: "NGN",
+    method: "korapay", // reusing method column — or change to "bank_transfer" if you prefer
+    crypto_tx_note: `Sender: ${parsed.data.senderName} | Ref: ${parsed.data.txNote}`,
+    status: "pending",
+  });
+
+  if (error) {
+    return { error: "Could not submit — please try again." };
+  }
+
+  return {
+    success: true,
+    message: "Transfer submitted! We'll credit your wallet within 10 minutes of confirmation.",
+  };
+}
