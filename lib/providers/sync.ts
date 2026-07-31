@@ -37,8 +37,8 @@ export async function syncActiveProviderCatalog(): Promise<SyncResult> {
     const prior = existingByProviderServiceId.get(service.providerServiceId);
     return {
       provider: provider.key,
-      provider_service_id: service.providerServiceId,
-      name: service.name,
+      supports_refill: service.refill ?? false,
+supports_cancel: service.cancel ?? false,
       provider_type: service.type,
       category: service.category,
       provider_rate: service.rate,
