@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone', // 🔑 REQUIRED for container deployments
   reactStrictMode: true,
   images: {
     remotePatterns: [
