@@ -1,63 +1,92 @@
-#17 0.811 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+import "server-only";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getActiveProvider } from "./registry";
 
-#17 0.835   Creating an optimized production build ...
+export interface SyncResult {
+  provider: string;
+  synced: number;
+  deactivated: number;
+}
 
-#17 6.421 ✓ Compiled successfully in 5.4s
+/**
+ * Pulls the full catalog from whichever provider is currently active and
+ * upserts it into `services`, keyed on (provider, provider_service_id).
+ */
+export async function syncActiveProviderCatalog(): Promise<SyncResult> {
+  const provider = await getActiveProvider();
+  const services = await provider.getServices({ skipCache: true });
+  const admin = createAdminClient();
 
-#17 6.443   Running TypeScript ...
+  const { data: existing, error: fetchError } = await admin
+    .from("services")
+    .select("provider_service_id, markup_percent, is_active")
+    .eq("provider", provider.key);
+  
+  if (fetchError) {
+    console.error("Failed to fetch existing services:", fetchError);
+    throw new Error(`Failed to fetch existing services: ${fetchError.message}`);
+  }
 
-#17 11.07 Failed to type check.
+  const existingByProviderServiceId = new Map(
+    (existing ?? []).map((row) => [row.provider_service_id, row])
+  );
+  const seenIds = new Set<string>();
 
-#17 11.07 
+  const upserts = services.map((service) => {
+    seenIds.add(service.providerServiceId);
+    const prior = existingByProviderServiceId.get(service.providerServiceId);
+    return {
+      provider: provider.key,
+      provider_service_id: service.providerServiceId,
+      name: service.name,
+      provider_type: service.type,
+      category: service.category,
+      provider_rate: service.rate,
+      markup_percent: prior?.markup_percent ?? 30,
+      min_quantity: service.min,
+      max_quantity: service.max,
+      supports_refill: service.refill ?? false,
+      supports_cancel: service.cancel ?? false,
+      is_active: prior ? prior.is_active : true,
+      synced_at: new Date().toISOString(),
+    };
+  });
 
-#17 11.07 ./lib/providers/sync.ts:48:7
+  if (upserts.length > 0) {
+    const { error } = await admin
+      .from("services")
+      .upsert(upserts, { onConflict: "provider,provider_service_id" });
+    
+    if (error) {
+      console.error("Upsert failed:", error);
+      throw new Error(`Failed to upsert services: ${error.message}`);
+    }
+  }
 
-#17 11.07 Type error: An object literal cannot have multiple properties with the same name.
+  const staleIds = [...existingByProviderServiceId.keys()].filter((id) => !seenIds.has(id));
+  if (staleIds.length > 0) {
+    const { error } = await admin
+      .from("services")
+      .update({ is_active: false })
+      .eq("provider", provider.key)
+      .in("provider_service_id", staleIds);
+    
+    if (error) {
+      console.error("Deactivation failed:", error);
+      throw new Error(`Failed to deactivate stale services: ${error.message}`);
+    }
+  }
 
-#17 11.07 
+  const { error: settingsError } = await admin
+    .from("app_settings")
+    .upsert({ 
+      key: `${provider.key}_last_synced_at`, 
+      value: new Date().toISOString() 
+    });
+  
+  if (settingsError) {
+    console.error("Failed to update last sync time:", settingsError);
+  }
 
-#17 11.07   46 |       min_quantity: service.min,
-
-#17 11.07   47 |       max_quantity: service.max,
-
-#17 11.07 > 48 |       supports_refill: service.refill ?? false,   // ← coerce null to false
-
-#17 11.07      |       ^
-
-#17 11.07   49 |       supports_cancel: service.cancel ?? false,     // ← coerce null to false
-
-#17 11.07   50 |       is_active: prior ? prior.is_active : true,
-
-#17 11.07   51 |       synced_at: new Date().toISOString(),
-
-#17 11.17 Next.js build worker exited with code: 1 and signal: null
-
-#17 ERROR: process "npm run build" did not complete successfully: exit code: 1
-
-------
-
- > npm run build:
-
-11.07 Type error: An object literal cannot have multiple properties with the same name.
-
-11.07 
-
-11.07   46 |       min_quantity: service.min,
-
-11.07   47 |       max_quantity: service.max,
-
-11.07 > 48 |       supports_refill: service.refill ?? false,   // ← coerce null to false
-
-11.07      |       ^
-
-11.07   49 |       supports_cancel: service.cancel ?? false,     // ← coerce null to false
-
-11.07   50 |       is_active: prior ? prior.is_active : true,
-
-11.07   51 |       synced_at: new Date().toISOString(),
-
-11.17 Next.js build worker exited with code: 1 and signal: null
-
-------
-
-error: failed to solve: process "npm run build" did not complete successfully: exit code: 1
+  return { provider: provider.key, synced: upserts.length, deactivated: staleIds.length };
+}
