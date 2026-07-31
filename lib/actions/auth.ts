@@ -102,7 +102,7 @@ export async function signInAction(
   redirect("/dashboard");
 }
 
-export async function signInWithGoogleAction(): Promise<AuthActionState> {
+export async function signInWithGoogleAction(): Promise<void> {
   const supabase = await createClient();
   const appUrl = await getAppUrl();
 
@@ -112,6 +112,13 @@ export async function signInWithGoogleAction(): Promise<AuthActionState> {
       redirectTo: `${appUrl}/auth/callback?next=/dashboard`,
     },
   });
+
+  if (error || !data.url) {
+    redirect("/login?error=google-oauth-failed");
+  }
+
+  redirect(data.url);
+}
 
   if (error || !data.url) {
     return { error: "Google sign-in failed. Please try again." };
