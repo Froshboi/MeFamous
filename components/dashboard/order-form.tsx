@@ -52,7 +52,9 @@ export function OrderForm({
           className={inputClass}
         />
       </div>
-      <p className="text-xs text-slate-500">${ratePerThousand.toFixed(2)} per 1,000</p>
+      <p className="text-xs text-slate-500">
+        ₦{ratePerThousand.toFixed(2)} per 1,000
+      </p>
       <button type="submit" className={primaryButtonClass}>
         Place order
       </button>
