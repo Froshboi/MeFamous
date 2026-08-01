@@ -14,7 +14,7 @@ export default async function SettingsPage() {
     .eq("id", user.id)
     .single();
 
-  const { data: referralCount } = await supabase
+  const { count: referralCount } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("referred_by", user.id);
