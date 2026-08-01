@@ -1,25 +1,48 @@
-import { getCurrentUser } from "@/lib/supabase/queries/profile";
+import { createClient } from "@/lib/supabase/server";
+import { ProfileSettingsForm } from "@/components/dashboard/profile-settings-form";
+import { redirect } from "next/navigation";
 
 export default async function ProfilePage() {
-  const user = await getCurrentUser();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email, avatar_url, referral_code, referred_by, role, wallet_balance")
+    .eq("id", user.id)
+    .single();
+
+  const { data: referralCount } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("referred_by", user.id);
+
+  const { data: referralEarnings } = await supabase
+    .from("referral_rewards")
+    .select("amount")
+    .eq("referrer_id", user.id);
+
+  const totalEarnings = referralEarnings?.reduce((sum, r) => sum + Number(r.amount || 0), 0) ?? 0;
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-semibold">Profile</h1>
-      <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Full name</p>
-          <p className="mt-1 text-slate-50">{user?.fullName ?? "—"}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Email</p>
-          <p className="mt-1 text-slate-50">{user?.email}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Account type</p>
-          <p className="mt-1 capitalize text-slate-50">{user?.role}</p>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold">Profile & Settings</h1>
+        <p className="text-sm text-slate-400">Manage your account, security, and referrals.</p>
       </div>
+
+      <ProfileSettingsForm
+        userId={user.id}
+        email={user.email ?? ""}
+        fullName={profile?.full_name ?? ""}
+        avatarUrl={profile?.avatar_url ?? null}
+        referralCode={profile?.referral_code ?? ""}
+        referralCount={referralCount ?? 0}
+        referralEarnings={totalEarnings}
+        walletBalance={profile?.wallet_balance ?? 0}
+      />
     </div>
   );
 }
