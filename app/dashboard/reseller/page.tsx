@@ -3,9 +3,10 @@ import { BulkOrderForm } from "@/components/dashboard/bulk-order-form";
 
 export default async function ResellerToolsPage() {
   const supabase = await createClient();
+
   const { data: services } = await supabase
     .from("services")
-    .select("id, name, category")
+    .select("id, name, category, customer_rate, min_quantity, max_quantity")
     .eq("is_active", true)
     .order("category")
     .order("name");
