@@ -7,7 +7,7 @@ const nextConfig = {
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "cdn.jsdelivr.net" },
     ],
-    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   async headers() {
     return [
@@ -23,12 +23,6 @@ const nextConfig = {
         source: "/_next/static/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
-        source: "/(.*\\.(svg|png|jpg|jpeg|webp|ico|css|js))",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=86400" },
         ],
       },
     ];
