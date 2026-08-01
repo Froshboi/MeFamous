@@ -9,8 +9,13 @@ const RESELLER_ONLY_PREFIXES = ["/dashboard/reseller"];
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // 🔑 PASS THROUGH — don't touch cookies before OAuth callback handler
-  if (path === "/auth/callback" || path.startsWith("/auth/")) {
+  // Skip auth for public assets, API routes, and auth callbacks
+  if (
+    path.startsWith("/_next") ||
+    path.startsWith("/api/") ||
+    path.startsWith("/auth/") ||
+    path.match(/\.(svg|png|jpg|jpeg|webp|ico|json|js|css)$/)
+  ) {
     return NextResponse.next({ request: { headers: request.headers } });
   }
 
@@ -62,19 +67,11 @@ export async function middleware(request: NextRequest) {
     const role = (profile?.role as string | undefined) ?? "customer";
 
     if (isAdminOnly && role !== "admin" && role !== "super_admin") {
-      const redirectResponse = NextResponse.redirect(new URL("/dashboard", request.url));
-      response.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie);
-      });
-      return redirectResponse;
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
     if (isResellerOnly && role !== "reseller" && role !== "admin" && role !== "super_admin") {
-      const redirectResponse = NextResponse.redirect(new URL("/dashboard", request.url));
-      response.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie);
-      });
-      return redirectResponse;
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
@@ -82,5 +79,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp|css|js)$).*)"],
 };
