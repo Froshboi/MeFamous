@@ -92,6 +92,7 @@ export default async function ServicesPage({
                     </div>
                     <OrderForm
                       serviceId={service.id}
+                      category={service.category}
                       minQuantity={service.min_quantity}
                       maxQuantity={service.max_quantity}
                       ratePerThousand={service.customer_rate}
