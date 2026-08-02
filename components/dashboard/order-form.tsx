@@ -3,16 +3,19 @@
 import { useActionState } from "react";
 import { placeOrderAction, type PlaceOrderState } from "@/lib/actions/orders";
 import { inputClass, primaryButtonClass } from "@/components/auth/auth-card";
+import { getPlatformPlaceholder } from "@/lib/platform-branding";
 
 const initialState: PlaceOrderState = {};
 
 export function OrderForm({
   serviceId,
+  category,
   minQuantity,
   maxQuantity,
   ratePerThousand,
 }: {
   serviceId: number;
+  category: string;
   minQuantity: number;
   maxQuantity: number;
   ratePerThousand: number;
@@ -33,7 +36,7 @@ export function OrderForm({
           name="link"
           type="url"
           required
-          placeholder="https://instagram.com/yourprofile"
+          placeholder={getPlatformPlaceholder(category)}
           className={inputClass}
         />
       </div>
